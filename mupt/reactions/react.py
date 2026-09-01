@@ -1,7 +1,7 @@
 '''Engine-agnostic entry point for reaction workflows described by a MuPT reactions config'''
 
-__author__ = 'Salman Bin Kashif'
-__email__ = 'salmanbinkashif@gmail.com'
+__author__ = 'Salman Bin Kashif, Janitha Manhanthe'
+__email__ = 'salmanbinkashif@gmail.com, jmanhanth@stevens.edu'
 
 import yaml
 
@@ -9,14 +9,15 @@ import yaml
 # All suported reaction engines are listed here, so that run_reactions can dispatch to the right one.
 # SUPPORTED_ENGINES = MuPT can generate run-ready project directories for the chosen engine that users will run on their own.
 # PLANNED_ENGINES = Work is underway to support these engines, but MuPT does not yet generate run-ready project directories for them.
-SUPPORTED_ENGINES = ('polymerizeit',)
-PLANNED_ENGINES = {
-    'reacter': 'REACTER input generation goes through AutoREACTER, which will be integrated soon.',
-}
+SUPPORTED_ENGINES = ('polymerizeit', "reacter")
+REQUIRED_REACTION_KEYS = ('reactants', 'react_template', 'react_idx',
+                          'products', 'prod_template', 'prod_idx')
+REQUIRED_MONOMER_KEYS = ('name', 'smi')
 
 
 def run_reactions(inputs):
-    '''Run the reaction workflow named by a MuPT reactions config.
+    '''
+    Run the reaction workflow named by a MuPT reactions config.
 
     The config is common to every reaction engine; `reaction_engine['name']` selects which one runs.
 
@@ -41,35 +42,49 @@ def run_reactions(inputs):
         with open(inputs, 'r') as f:
             inputs = yaml.safe_load(f)
 
-    validate_config(inputs)
-
     engine = inputs['reaction_engine']['name']
+    engine = str(engine).strip().lower()
+
+    if engine not in SUPPORTED_ENGINES:
+        raise ValueError(
+            f'Unrecognized reaction engine {engine!r}. '
+            f'Expected one of {sorted(SUPPORTED_ENGINES)}.'
+        )
 
     # Engine names are compared case-insensitively so that the shared schema accepts both the
     # lower-case form used by MuPT's examples and the upper-case form used in REACTER's.
-    engine = str(engine).strip().lower()
 
     if engine == 'polymerizeit':
         # Imported here rather than at module scope so that dispatching to another engine, or
         # rejecting an unknown one, does not pay for PolymerizeIt!'s RDKit-backed import chain.
+        validate_config(inputs)
+
         from mupt.reactions.polymerizeit.make_pi import make_pi
 
         return make_pi(inputs)
 
-    if engine in PLANNED_ENGINES:
-        raise NotImplementedError(f'Reaction engine {engine!r} is not implemented. {PLANNED_ENGINES[engine]}')
+    if engine == 'reacter':
+        # Imported here rather than at module scope so that dispatching to another engine, or
+        # rejecting an unknown one, does not pay for REACTER's import chain.
+        # AutoREACTER's entry point is imported here to avoid paying for its import chain unless needed.
+        # With AutoREACTER, you dont need a validator becauser AutoREACTER handles validation internally.
+        # But AutoREACTER will natively read .json while mupt input will be a YAML file.
+        # So arx_phaser will handle the conversion from YAML to JSON internally.
 
-    known = sorted(SUPPORTED_ENGINES + tuple(PLANNED_ENGINES))
-    raise ValueError(f'Unrecognized reaction engine {engine!r}. Expected one of {known}.')
+        from mupt.reactions.reacter import arx_phaser
+
+        return arx_phaser(inputs)
+
+    known = sorted(SUPPORTED_ENGINES)
+    raise ValueError(
+        f'Unrecognized reaction engine {engine!r}. '
+        f'Expected one of {known}.'
+    )
 
 
 # Keys every reactions config carries, whichever engine runs it. The per-reaction keys are the reaction
 # template: which molecules react, the SMARTS patterns matching their reactive groups, and which atom of
 # each pattern reacts. The *molecule* atom indices are derived from these, not supplied.
-REQUIRED_REACTION_KEYS = ('reactants', 'react_template', 'react_idx',
-                          'products', 'prod_template', 'prod_idx')
-REQUIRED_MONOMER_KEYS = ('name', 'smi')
-
 
 def validate_config(inputs):
     '''Check the engine-agnostic structure of a reactions config.
@@ -125,3 +140,9 @@ def validate_config(inputs):
 
     if problems:
         raise ValueError('Invalid reactions config:\n  - ' + '\n  - '.join(problems))
+
+
+
+if __name__ == "__main__":
+    test_file = "/mnt/c/Users/Janitha/Documents/GitHub/mupt-reactions/mupt/reactions/polyamide_mpd-tmc_for_reacter.yaml"
+    run_reactions(test_file)
