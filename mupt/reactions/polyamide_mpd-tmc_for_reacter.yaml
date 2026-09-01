@@ -3,9 +3,9 @@ dirname: polyamide_mpd-tmc
 # Define SMILES strings for the monomers
 monomers:
     - name: MPD
-      smi: 'c1ccc(N)cc1N'
+      smiles: 'c1ccc(N)cc1N'
     - name: TMC
-      smi: 'c1c(C(=O)Cl)cc(C(=O)Cl)cc1C(=O)Cl'
+      smiles: 'c1c(C(=O)Cl)cc(C(=O)Cl)cc1C(=O)Cl'
 
 # Define the pieces of the reaction template
 reactions:
